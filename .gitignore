@@ -12,7 +12,6 @@ out/
 .mcp.json
 .opencode.json
 .windsurfrules
-AGENTS.md
 CLAUDE.md
 GEMINI.md
 QODER.md
