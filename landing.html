@@ -1,0 +1,306 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AI技能管理器 - 本地 AI Skills 管理工具</title>
+<style>
+  :root {
+    --bg: #f8f8fa;
+    --bg-card: #fff;
+    --bg-dark: #0d0d12;
+    --text: #1d1d1f;
+    --text-secondary: #6e6e73;
+    --accent: #0a84ff;
+    --accent-hover: #0070e0;
+    --border: #e8e8ed;
+    --radius: 12px;
+    --radius-lg: 20px;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+    background: var(--bg); color: var(--text);
+    -webkit-font-smoothing: antialiased; line-height: 1.6;
+  }
+  .container { max-width: 1080px; margin: 0 auto; padding: 0 32px; }
+
+  /* Nav */
+  nav {
+    position: fixed; top: 0; left: 0; right: 0; z-index: 100;
+    backdrop-filter: blur(20px) saturate(180%);
+    background: rgba(248,248,250,0.72); border-bottom: 1px solid var(--border);
+  }
+  nav .container {
+    display: flex; align-items: center; justify-content: space-between;
+    height: 56px;
+  }
+  .nav-logo { font-size: 17px; font-weight: 700; letter-spacing: -.3px; display: flex; align-items: center; gap: 10px; }
+  .nav-logo .icon {
+    width: 32px; height: 32px; border-radius: 8px;
+    background: var(--accent); display: flex; align-items: center; justify-content: center;
+  }
+  .nav-logo .icon svg { width: 18px; height: 18px; }
+  .nav-links { display: flex; gap: 6px; }
+  .nav-links a {
+    text-decoration: none; color: var(--text-secondary); font-size: 14px; font-weight: 500;
+    padding: 8px 14px; border-radius: 8px; transition: all .15s;
+  }
+  .nav-links a:hover { background: rgba(0,0,0,0.04); color: var(--text); }
+  .btn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 10px 20px; border: none; border-radius: var(--radius);
+    font-size: 14px; font-weight: 600; cursor: pointer; text-decoration: none;
+    transition: all .15s; font-family: inherit; letter-spacing: -.1px;
+  }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-primary:hover { background: var(--accent-hover); transform: translateY(-1px); box-shadow: 0 4px 16px rgba(10,132,255,0.3); }
+  .btn-outline { background: transparent; color: var(--text); border: 1.5px solid var(--border); }
+  .btn-outline:hover { border-color: var(--text); }
+  .btn-lg { padding: 14px 28px; font-size: 16px; border-radius: var(--radius-lg); }
+
+  /* Hero */
+  .hero { padding: 160px 0 100px; text-align: center; }
+  .hero-badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 6px 14px; border-radius: 20px; background: rgba(10,132,255,0.08);
+    color: var(--accent); font-size: 13px; font-weight: 600; margin-bottom: 24px;
+  }
+  .hero-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--accent); animation: pulse 2s infinite; }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .3; } }
+  .hero h1 { font-size: 56px; font-weight: 700; letter-spacing: -1.2px; line-height: 1.1; margin-bottom: 20px; }
+  .hero h1 span { background: linear-gradient(135deg, #0a84ff, #6366f1); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+  .hero p { font-size: 18px; color: var(--text-secondary); max-width: 520px; margin: 0 auto 36px; }
+  .hero-actions { display: flex; justify-content: center; gap: 12px; }
+  .hero-screen {
+    margin-top: 64px; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: 0 20px 60px rgba(0,0,0,0.06);
+    overflow: hidden; max-width: 900px; margin-left: auto; margin-right: auto;
+  }
+  .hero-screen-bar {
+    height: 36px; background: #f3f3f6; display: flex; align-items: center; gap: 6px; padding: 0 14px;
+  }
+  .hero-screen-bar .dot { width: 10px; height: 10px; border-radius: 50%; }
+  .hero-screen-bar .dot:nth-child(1) { background: #ff5f57; }
+  .hero-screen-bar .dot:nth-child(2) { background: #febc2e; }
+  .hero-screen-bar .dot:nth-child(3) { background: #28c840; }
+  .hero-screen-img {
+    height: 440px; background: var(--bg);
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-tertiary, #aeaeb2); font-size: 14px;
+  }
+
+  /* Sections */
+  section { padding: 100px 0; }
+  .section-label {
+    font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;
+    color: var(--accent); margin-bottom: 12px;
+  }
+  .section-title { font-size: 36px; font-weight: 700; letter-spacing: -.6px; margin-bottom: 16px; }
+  .section-desc { font-size: 16px; color: var(--text-secondary); max-width: 600px; }
+
+  /* Features */
+  .features-grid {
+    display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px;
+    margin-top: 48px;
+  }
+  .feature-card {
+    background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); padding: 28px;
+    transition: all .2s;
+  }
+  .feature-card:hover { box-shadow: 0 4px 24px rgba(0,0,0,0.04); transform: translateY(-2px); }
+  .feature-icon {
+    width: 44px; height: 44px; border-radius: var(--radius);
+    background: rgba(10,132,255,0.08); display: flex; align-items: center; justify-content: center;
+    margin-bottom: 16px; color: var(--accent);
+  }
+  .feature-card h3 { font-size: 17px; font-weight: 600; margin-bottom: 8px; letter-spacing: -.2px; }
+  .feature-card p { font-size: 14px; color: var(--text-secondary); line-height: 1.6; }
+
+  /* Showcase */
+  .showcase-row {
+    display: flex; align-items: center; gap: 80px; margin-top: 56px;
+  }
+  .showcase-row.reverse { flex-direction: row-reverse; }
+  .showcase-text { flex: 1; }
+  .showcase-text h3 { font-size: 24px; font-weight: 700; margin-bottom: 12px; letter-spacing: -.3px; }
+  .showcase-text p { font-size: 15px; color: var(--text-secondary); line-height: 1.7; }
+  .showcase-screen {
+    flex: 1; background: var(--bg-card); border: 1px solid var(--border);
+    border-radius: var(--radius-lg); box-shadow: 0 8px 32px rgba(0,0,0,0.04);
+    height: 300px; display: flex; align-items: center; justify-content: center;
+    color: var(--text-tertiary, #aeaeb2); font-size: 13px;
+  }
+
+  /* CTA */
+  .cta {
+    background: var(--bg-dark); color: #fff; text-align: center; border-radius: var(--radius-lg);
+    padding: 80px 60px; margin: 40px 0;
+  }
+  .cta h2 { font-size: 36px; font-weight: 700; letter-spacing: -.6px; margin-bottom: 12px; }
+  .cta p { font-size: 16px; color: rgba(255,255,255,0.6); margin-bottom: 32px; }
+  .cta .btn-primary { background: #fff; color: var(--bg-dark); }
+  .cta .btn-primary:hover { background: #e8e8ed; box-shadow: 0 4px 16px rgba(255,255,255,0.2); }
+  .cta .btn-outline { color: rgba(255,255,255,0.8); border-color: rgba(255,255,255,0.2); }
+  .cta .btn-outline:hover { border-color: rgba(255,255,255,0.5); color: #fff; }
+
+  /* Footer */
+  footer {
+    border-top: 1px solid var(--border); padding: 32px 0;
+    display: flex; justify-content: space-between; align-items: center;
+    font-size: 13px; color: var(--text-secondary);
+  }
+
+  /* Responsive */
+  @media (max-width: 768px) {
+    .hero h1 { font-size: 36px; }
+    .features-grid { grid-template-columns: 1fr; }
+    .showcase-row, .showcase-row.reverse { flex-direction: column; gap: 32px; }
+    .showcase-screen { width: 100%; height: 200px; }
+    .cta { padding: 48px 24px; }
+    .nav-links { display: none; }
+  }
+</style>
+</head>
+<body>
+<nav>
+  <div class="container">
+    <div class="nav-logo">
+      <div class="icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><path d="M5 9h14M5 15h10M5 12h7"/></svg>
+      </div>
+      AI技能管理器
+    </div>
+    <div class="nav-links">
+      <a href="#features">功能</a>
+      <a href="#showcase">预览</a>
+      <a href="#cta">下载</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero">
+  <div class="container">
+    <div class="hero-badge"><span class="dot"></span> v1.0 现已发布</div>
+    <h1>让 AI Skills <span>井井有条</span></h1>
+    <p>跨平台本地管理工具，浏览、编辑、翻译、导入导出，一站式管理你的 AI 技能库。</p>
+    <div class="hero-actions">
+      <a href="#cta" class="btn btn-primary btn-lg">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        免费下载
+      </a>
+      <a href="https://github.com" class="btn btn-outline btn-lg">GitHub</a>
+    </div>
+  </div>
+  <div class="container">
+    <div class="hero-screen">
+      <div class="hero-screen-bar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+      </div>
+      <div class="hero-screen-img">
+        📸 软件主界面截图
+      </div>
+    </div>
+  </div>
+</header>
+
+<section id="features">
+  <div class="container">
+    <div class="section-label">核心功能</div>
+    <h2 class="section-title">一站式管理你的技能库</h2>
+    <p class="section-desc">从浏览到编辑，从翻译到导入，覆盖技能管理的完整生命周期。</p>
+    <div class="features-grid">
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </div>
+        <h3>智能浏览</h3>
+        <p>分栏布局，左侧列表右侧详情。实时搜索、多维度排序，164+ 技能也能轻松定位。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+        </div>
+        <h3>Markdown 编辑</h3>
+        <p>SKILL.md 内容自动渲染为标准格式，标题、代码块、表格完整呈现，所见即所得。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"/><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+        </div>
+        <h3>一键翻译</h3>
+        <p>基于 DeepSeek v4-flash，一键将英文技能文档译为中文，译文自动保存，不修改原文。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        </div>
+        <h3>ZIP 导入</h3>
+        <p>拖入或选择 .zip 包，自动校验结构、提取技能名、解压安装，支持路径穿越防护。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        </div>
+        <h3>启用 / 禁用</h3>
+        <p>通过目录搬迁实现技能开关，禁用技能不会出现在扫描路径中，无需修改文件。</p>
+      </div>
+      <div class="feature-card">
+        <div class="feature-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="20" height="20"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+        </div>
+        <h3>深色模式</h3>
+        <p>Premium Minimal 设计风格，Apple 配色体系，跟随系统或手动切换浅色 / 深色。</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="showcase">
+  <div class="container">
+    <div class="section-label">界面预览</div>
+    <h2 class="section-title">精致，从里到外</h2>
+
+    <div class="showcase-row">
+      <div class="showcase-text">
+        <h3>分栏布局，一目了然</h3>
+        <p>左侧紧凑列表展示全部技能，实时搜索过滤，多维度排序。选中即可在右侧查看完整详情、Markdown 渲染内容及翻译结果。</p>
+      </div>
+      <div class="showcase-screen">📸 分栏布局截图</div>
+    </div>
+
+    <div class="showcase-row reverse" style="margin-top: 80px;">
+      <div class="showcase-text">
+        <h3>编辑与翻译一体化</h3>
+        <p>右侧面板内直接编辑所有字段。DeepSeek 翻译一键生成中文译文，独立保存为 SKILL.zh-CN.md，不改动原文。</p>
+      </div>
+      <div class="showcase-screen">📸 编辑与翻译截图</div>
+    </div>
+  </div>
+</section>
+
+<section id="cta">
+  <div class="container">
+    <div class="cta">
+      <h2>开始管理你的技能库</h2>
+      <p>支持 macOS、Windows、Linux，开源免费</p>
+      <div class="hero-actions" style="margin-top: 8px;">
+        <a href="#" class="btn btn-primary btn-lg">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+          下载 macOS 版
+        </a>
+        <a href="https://github.com" class="btn btn-outline btn-lg">查看源码</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="container" style="display:flex;justify-content:space-between;align-items:center;width:100%;">
+    <span>AI技能管理器 &copy; 2026</span>
+    <span style="color:var(--text-secondary)">Electron · React · DeepSeek</span>
+  </div>
+</footer>
+</body>
+</html>
