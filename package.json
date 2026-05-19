@@ -1,7 +1,7 @@
 {
   "name": "ai-skills-manager",
   "productName": "AI技能管理器",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "description": "跨平台 AI 技能管理器 - 本地管理 AI Skills",
   "main": ".webpack/main",
   "scripts": {

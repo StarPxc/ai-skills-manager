@@ -301,3 +301,35 @@ ipcMain.handle('screenshot', async () => {
     return { success: false, error: err.message };
   }
 });
+
+ipcMain.handle('sync-skills', async (_event, fromDir, toDir) => {
+  try {
+    logger.info('sync-skills:', fromDir, '->', toDir);
+    if (!fs.existsSync(fromDir)) return { success: false, error: '源目录不存在' };
+    if (!fs.existsSync(toDir)) fs.mkdirSync(toDir, { recursive: true });
+
+    let copied = 0;
+    let skipped = 0;
+    const entries = fs.readdirSync(fromDir, { withFileTypes: true });
+
+    for (const entry of entries) {
+      if (!entry.isDirectory() || entry.name.startsWith('.')) continue;
+      const srcPath = path.join(fromDir, entry.name);
+      const dstPath = path.join(toDir, entry.name);
+
+      if (fs.existsSync(dstPath)) {
+        skipped++;
+        continue;
+      }
+
+      fs.cpSync(srcPath, dstPath, { recursive: true });
+      copied++;
+    }
+
+    logger.info('sync-skills done:', copied, 'copied,', skipped, 'skipped');
+    return { success: true, copied, skipped };
+  } catch (err) {
+    logger.error('sync-skills failed:', err.message);
+    return { success: false, error: err.message };
+  }
+});

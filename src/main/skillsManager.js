@@ -27,9 +27,10 @@ function saveSettings() {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
+    console.log('[skillsManager] saving settings:', { skillsDir: customSkillsDir, apiKey });
     fs.writeFileSync(SETTINGS_PATH, JSON.stringify({ skillsDir: customSkillsDir, apiKey }, null, 2));
-  } catch {
-    // silently fail
+  } catch (err) {
+    console.error('[skillsManager] saveSettings failed:', err.message);
   }
 }
 

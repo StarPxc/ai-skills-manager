@@ -19,4 +19,5 @@ contextBridge.exposeInMainWorld('api', {
   loadTranslation: (skillName) => ipcRenderer.invoke('load-translation', skillName),
   saveTranslation: (skillName, translated) => ipcRenderer.invoke('save-translation', skillName, translated),
   screenshot: () => ipcRenderer.invoke('screenshot'),
+  syncSkills: (fromDir, toDir) => ipcRenderer.invoke('sync-skills', fromDir, toDir),
 });
