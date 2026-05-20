@@ -20,6 +20,7 @@ module.exports = {
   target: 'electron-main',
   externals: {
     'adm-zip': 'commonjs adm-zip',
+    'better-sqlite3': 'commonjs better-sqlite3',
   },
   node: {
     __dirname: false,

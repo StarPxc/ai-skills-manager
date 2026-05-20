@@ -1,32 +1,13 @@
 import React, { useState, useEffect } from 'react';
 
-const PRESETS = [
-  { label: 'Claude Code', path: '' }, // filled on mount
-  { label: 'OpenCode', path: '' },    // filled on mount
-  { label: '自定义', path: '__custom__' },
-];
-
 export default function SettingsModal({ currentDir, onSave, onClose, onNotify }) {
   const [dirPath, setDirPath] = useState(currentDir || '');
-  const [preset, setPreset] = useState('');
-  const [defaultDir, setDefaultDir] = useState('');
-  const [openCodeDir, setOpenCodeDir] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [logPath, setLogPath] = useState('');
   const [syncDir, setSyncDir] = useState('');
   const [syncing, setSyncing] = useState(false);
 
   useEffect(() => {
-    window.api.getDefaultSkillsDir().then((d) => {
-      setDefaultDir(d);
-      PRESETS[0].path = d;
-      const ocDir = d.replace(/\.claude\/skills$/, '.config/opencode/skills');
-      PRESETS[1].path = ocDir;
-      setOpenCodeDir(ocDir);
-      if (currentDir === d) setPreset(d);
-      else if (currentDir === ocDir) setPreset(ocDir);
-      else { setPreset('__custom__'); }
-    });
     window.api.getApiKey().then(setApiKey);
     window.api.getLogPath().then(setLogPath);
   }, []);
@@ -37,23 +18,19 @@ export default function SettingsModal({ currentDir, onSave, onClose, onNotify })
     return () => window.removeEventListener('keydown', handleKey);
   }, [onClose]);
 
-  const handlePresetChange = (p) => {
-    setPreset(p);
-    if (p !== '__custom__') setDirPath(p);
-  };
-
   const handleBrowse = async () => {
     const result = await window.api.selectFolder();
     if (result.success && result.folderPath) {
       setDirPath(result.folderPath);
-      setPreset('__custom__');
     }
   };
 
   const handleSave = async () => {
-    const finalDir = dirPath.trim() || defaultDir;
+    const finalDir = dirPath.trim() || currentDir;
     await window.api.setApiKey(apiKey.trim());
-    await window.api.setSkillsDir(finalDir);
+    if (finalDir !== currentDir) {
+      await window.api.setSkillsDir(finalDir);
+    }
     onSave(finalDir);
   };
 
@@ -87,37 +64,26 @@ export default function SettingsModal({ currentDir, onSave, onClose, onNotify })
         <div className="modal-body">
           <div className="settings-info">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="18" height="18" style={{ flexShrink: 0, marginTop: 1 }}><circle cx="12" cy="12" r="10" /><line x1="12" y1="16" x2="12" y2="12" /><line x1="12" y1="8" x2="12.01" y2="8" /></svg>
-            <span>配置技能存储目录与 DeepSeek API Key。</span>
+            <span>配置 DeepSeek API Key 与自定义技能目录。技能来源可通过主界面左侧标签切换。</span>
           </div>
 
-          <div className="form-group">
-            <label>技能目录</label>
-            <div className="preset-options">
-              <label className={`preset-option ${preset === PRESETS[0].path ? 'active' : ''}`}>
-                <input type="radio" name="preset" checked={preset === PRESETS[0].path} onChange={() => handlePresetChange(PRESETS[0].path)} />
-                <span className="preset-label">Claude Code</span>
-                <span className="preset-path">{PRESETS[0].path}</span>
-              </label>
-              <label className={`preset-option ${preset === PRESETS[1].path ? 'active' : ''}`}>
-                <input type="radio" name="preset" checked={preset === PRESETS[1].path} onChange={() => handlePresetChange(PRESETS[1].path)} />
-                <span className="preset-label">OpenCode</span>
-                <span className="preset-path">{PRESETS[1].path}</span>
-              </label>
-              <label className={`preset-option ${preset === '__custom__' ? 'active' : ''}`}>
-                <input type="radio" name="preset" checked={preset === '__custom__'} onChange={() => handlePresetChange('__custom__')} />
-                <span className="preset-label">自定义</span>
-              </label>
-            </div>
-            <div className="dir-input-row" style={{ marginTop: 10 }}>
+          <div className="settings-current">
+            <strong>当前目录：</strong><br /><code>{currentDir}</code>
+          </div>
+
+          <div className="form-group" style={{ marginTop: 16 }}>
+            <label>自定义技能目录</label>
+            <div className="dir-input-row">
               <input
                 type="text"
                 value={dirPath}
-                onChange={(e) => { setDirPath(e.target.value); setPreset('__custom__'); }}
-                placeholder={defaultDir}
+                onChange={(e) => setDirPath(e.target.value)}
+                placeholder={currentDir}
                 spellCheck={false}
               />
               <button type="button" className="btn btn-secondary btn-sm" onClick={handleBrowse}>浏览...</button>
             </div>
+            <div className="form-hint">留空则使用主界面标签对应的默认目录</div>
           </div>
 
           <div className="form-group">
@@ -126,23 +92,17 @@ export default function SettingsModal({ currentDir, onSave, onClose, onNotify })
             <div className="form-hint">用于技能内容一键翻译。在 platform.deepseek.com 获取</div>
           </div>
 
-          <div className="settings-current">
-            <strong>当前目录：</strong><br /><code>{currentDir}</code>
-          </div>
-
           <div className="form-group" style={{ marginTop: 16 }}>
             <label>同步到其他目录</label>
             <div className="dir-input-row">
-              <select
+              <input
+                type="text"
                 value={syncDir}
                 onChange={(e) => setSyncDir(e.target.value)}
+                placeholder="输入目标目录路径..."
+                spellCheck={false}
                 style={{ flex: 1 }}
-              >
-                <option value="">— 选择目标目录 —</option>
-                {PRESETS.filter(p => p.path !== currentDir && p.path !== '__custom__' && p.path).map(p => (
-                  <option key={p.path} value={p.path}>{p.label} — {p.path}</option>
-                ))}
-              </select>
+              />
               <button
                 className="btn btn-sm btn-primary"
                 onClick={handleSync}
@@ -170,7 +130,7 @@ export default function SettingsModal({ currentDir, onSave, onClose, onNotify })
 
         <div className="modal-footer">
           <button type="button" className="btn btn-secondary" onClick={onClose}>取消</button>
-          <button type="button" className="btn btn-primary" onClick={handleSave} disabled={!dirPath.trim()}>保存设置</button>
+          <button type="button" className="btn btn-primary" onClick={handleSave}>保存设置</button>
         </div>
       </div>
     </div>

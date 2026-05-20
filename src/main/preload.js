@@ -20,4 +20,17 @@ contextBridge.exposeInMainWorld('api', {
   saveTranslation: (skillName, translated) => ipcRenderer.invoke('save-translation', skillName, translated),
   screenshot: () => ipcRenderer.invoke('screenshot'),
   syncSkills: (fromDir, toDir) => ipcRenderer.invoke('sync-skills', fromDir, toDir),
+  exportZip: (skillNames) => ipcRenderer.invoke('export-zip', skillNames),
+  getSessions: (source) => ipcRenderer.invoke('get-sessions', source),
+  getSessionDetail: (sessionId, source) => ipcRenderer.invoke('get-session-detail', sessionId, source),
+  createSessionShare: (sessionId, id, secret, url) => ipcRenderer.invoke('create-session-share', sessionId, id, secret, url),
+  searchSessions: (query) => ipcRenderer.invoke('search-sessions', query),
+  copyToClipboard: (text) => ipcRenderer.invoke('copy-to-clipboard', text),
+  exportSessionHtml: (sessionData) => ipcRenderer.invoke('export-session-html', sessionData),
+  rewatch: () => ipcRenderer.invoke('rewatch'),
+  onSkillsChanged: (callback) => {
+    const handler = () => callback();
+    ipcRenderer.on('skills-changed', handler);
+    return () => ipcRenderer.removeListener('skills-changed', handler);
+  },
 });

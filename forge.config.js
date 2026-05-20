@@ -1,9 +1,9 @@
 module.exports = {
   packagerConfig: {
     asar: true,
-    appBundleId: 'com.ai.skills.manager',
-    appCopyright: '2026 AI Skills Manager',
-    name: 'AI技能管理器',
+    appBundleId: 'com.ai.workbench',
+    appCopyright: '2026 AI 工作台',
+    name: 'AI 工作台',
   },
   rebuildConfig: {},
   makers: [

@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 
-export default function Header({ theme, onToggleTheme, onAdd, onInstallZip, onOpenSettings }) {
+export default function Header({ theme, onToggleTheme, onAdd, onInstallZip, onOpenSettings, mode, onModeChange }) {
   const [capturing, setCapturing] = useState(false);
 
   const handleScreenshot = async () => {
@@ -25,18 +25,37 @@ export default function Header({ theme, onToggleTheme, onAdd, onInstallZip, onOp
           <rect width="32" height="32" rx="8" fill="var(--accent)" />
           <path d="M8 12h16M8 20h12M8 16h10" stroke="#fff" strokeWidth="2.5" strokeLinecap="round" />
         </svg>
-        <span>AI技能管理器</span>
+        <span>AI 工作台</span>
+      </div>
+
+      <div className="header-nav">
+        <button
+          className={`header-nav-btn ${mode === 'skills' ? 'active' : ''}`}
+          onClick={() => onModeChange('skills')}
+        >
+          技能
+        </button>
+        <button
+          className={`header-nav-btn ${mode === 'sessions' ? 'active' : ''}`}
+          onClick={() => onModeChange('sessions')}
+        >
+          会话
+        </button>
       </div>
 
       <div className="header-actions">
-        <button className="header-btn primary" onClick={onAdd} title="新增技能">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><path d="M12 5v14M5 12h14" /></svg>
-          新增
-        </button>
-        <button className="header-btn" onClick={onInstallZip} title="导入技能包">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
-          导入
-        </button>
+        {mode === 'skills' && (
+          <>
+            <button className="header-btn primary" onClick={onAdd} title="新增技能">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><path d="M12 5v14M5 12h14" /></svg>
+              新增
+            </button>
+            <button className="header-btn" onClick={onInstallZip} title="导入技能包">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="17 8 12 3 7 8" /><line x1="12" y1="3" x2="12" y2="15" /></svg>
+              导入
+            </button>
+          </>
+        )}
         <button className="header-btn" onClick={handleScreenshot} disabled={capturing} title="截图保存到桌面">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" width="15" height="15"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" /></svg>
           {capturing ? '...' : '截图'}

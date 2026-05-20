@@ -1,10 +1,11 @@
 import React from 'react';
 
-export default function SkillListItem({ skill, selected, onSelect, onToggle, batchMode, checked, onCheck }) {
+export default function SkillListItem({ skill, selected, onSelect, onToggle, batchMode, checked, onCheck, index = 0 }) {
   return (
     <div
       className={`skill-list-item ${selected || checked ? 'selected' : ''} ${!skill.enabled ? 'disabled' : ''}`}
       onClick={() => batchMode ? onCheck(skill.name) : onSelect(skill)}
+      style={{ animationDelay: `${Math.min(index * 30, 500)}ms` }}
     >
       {batchMode && (
         <input

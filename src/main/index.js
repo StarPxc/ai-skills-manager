@@ -1,14 +1,25 @@
-const { app, BrowserWindow, ipcMain, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, dialog, clipboard } = require('electron');
 const path = require('path');
 const fs = require('fs');
 const skillsManager = require('./skillsManager');
 const logger = require('./logger');
+const dbManager = require('./dbManager');
+const claudeSessionManager = require('./claudeSessionManager');
 
 logger.info('=== App starting ===');
 logger.info('Platform:', process.platform, 'Arch:', process.arch, 'Electron:', process.versions.electron);
 logger.info('Skills dir:', skillsManager.getSkillsDirectory());
 
 let mainWindow;
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
+}
 
 function createWindow() {
   const preloadPath = path.join(__dirname, '..', 'renderer', 'main_window', 'preload.js');
@@ -19,7 +30,7 @@ function createWindow() {
     height: 800,
     minWidth: 900,
     minHeight: 600,
-    title: 'AI技能管理器',
+    title: 'AI 工作台',
     backgroundColor: '#fafafa',
     webPreferences: {
       preload: preloadPath,
@@ -57,6 +68,43 @@ app.whenReady().then(() => {
       createWindow();
     }
   });
+});
+
+let watchers = [];
+
+function startWatching() {
+  stopWatching();
+  const dirs = [skillsManager.getSkillsDirectory(), skillsManager.getDisabledSkillsDirectory()];
+  let debounce = null;
+
+  for (const dir of dirs) {
+    if (!fs.existsSync(dir)) continue;
+    try {
+      const w = fs.watch(dir, { recursive: true }, () => {
+        if (debounce) clearTimeout(debounce);
+        debounce = setTimeout(() => {
+          if (mainWindow && !mainWindow.isDestroyed()) {
+            mainWindow.webContents.send('skills-changed');
+          }
+        }, 500);
+      });
+      watchers.push(w);
+      logger.info('Watching:', dir);
+    } catch (err) {
+      logger.warn('Failed to watch:', dir, err.message);
+    }
+  }
+}
+
+function stopWatching() {
+  watchers.forEach((w) => w.close());
+  watchers = [];
+}
+
+startWatching();
+
+ipcMain.handle('rewatch', () => {
+  startWatching();
 });
 
 app.on('window-all-closed', () => {
@@ -291,7 +339,7 @@ ipcMain.handle('screenshot', async () => {
     const image = await mainWindow.webContents.capturePage();
     const desktopPath = app.getPath('desktop');
     const ts = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const filePath = path.join(desktopPath, `AI技能管理器截图-${ts}.png`);
+    const filePath = path.join(desktopPath, `AI工作台截图-${ts}.png`);
 
     fs.writeFileSync(filePath, image.toPNG());
     logger.info('screenshot saved:', filePath);
@@ -330,6 +378,237 @@ ipcMain.handle('sync-skills', async (_event, fromDir, toDir) => {
     return { success: true, copied, skipped };
   } catch (err) {
     logger.error('sync-skills failed:', err.message);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('export-zip', async (_event, skillNames) => {
+  try {
+    if (!skillNames || skillNames.length === 0) return { success: false, error: '未选择技能' };
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: '导出技能包',
+      defaultPath: `skills-export-${new Date().toISOString().slice(0, 10)}.zip`,
+      filters: [{ name: 'ZIP 文件', extensions: ['zip'] }],
+    });
+
+    if (result.canceled) return { success: false, error: '已取消' };
+
+    const AdmZip = require('adm-zip');
+    const zip = new AdmZip();
+    const activeDir = skillsManager.getSkillsDirectory();
+    const disabledDir = skillsManager.getDisabledSkillsDirectory();
+
+    for (const name of skillNames) {
+      let skillPath = path.join(activeDir, name);
+      if (!fs.existsSync(skillPath)) skillPath = path.join(disabledDir, name);
+      if (!fs.existsSync(skillPath)) continue;
+      zip.addLocalFolder(skillPath, name);
+    }
+
+    zip.writeZip(result.filePath);
+    logger.info('export-zip:', skillNames.length, 'skills to', result.filePath);
+    return { success: true, path: result.filePath };
+  } catch (err) {
+    logger.error('export-zip failed:', err.message);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('get-sessions', async (_event, source) => {
+  try {
+    if (source === 'claude') {
+      return claudeSessionManager.getSessions();
+    }
+    return dbManager.getSessions();
+  } catch (err) {
+    logger.error('get-sessions failed:', err.message);
+    return [];
+  }
+});
+
+ipcMain.handle('get-session-detail', async (_event, sessionId, source) => {
+  try {
+    if (source === 'claude') {
+      const result = claudeSessionManager.getSessionDetail(sessionId);
+      if (!result) return { success: false, error: '会话不存在' };
+      return { success: true, ...result };
+    }
+
+    const session = dbManager.getSession(sessionId);
+    if (!session) return { success: false, error: '会话不存在' };
+
+    const messages = dbManager.getSessionMessages(sessionId);
+    const enriched = messages.map((msg) => {
+      const data = JSON.parse(msg.data || '{}');
+      const parts = dbManager.getMessageParts(msg.id);
+      const parsedParts = parts.map((p) => {
+        try { return { ...p, parsedData: JSON.parse(p.data || '{}') }; }
+        catch { return { ...p, parsedData: {} }; }
+      });
+      return {
+        ...msg,
+        parsedData: data,
+        parts: parsedParts,
+      };
+    });
+
+    const share = dbManager.getSessionShare(sessionId);
+    return { success: true, session, messages: enriched, share };
+  } catch (err) {
+    logger.error('get-session-detail failed:', err.message);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('create-session-share', async (_event, sessionId, id, secret, url) => {
+  try {
+    const database = require('better-sqlite3')(dbManager.DB_PATH);
+    const now = Date.now();
+    database.prepare(`
+      INSERT OR REPLACE INTO session_share (session_id, id, secret, url, time_created, time_updated)
+      VALUES (?, ?, ?, ?, ?, ?)
+    `).run(sessionId, id, secret, url, now, now);
+    database.close();
+    clipboard.writeText(url);
+    return { success: true, url };
+  } catch (err) {
+    logger.error('create-session-share failed:', err.message);
+    return { success: false, error: err.message };
+  }
+});
+
+ipcMain.handle('search-sessions', async (_event, query, source) => {
+  try {
+    if (source === 'claude') {
+      return claudeSessionManager.searchSessions(query);
+    }
+    return dbManager.searchSessions(query);
+  } catch (err) {
+    logger.error('search-sessions failed:', err.message);
+    return [];
+  }
+});
+
+ipcMain.handle('copy-to-clipboard', async (_event, text) => {
+  clipboard.writeText(text);
+  return { success: true };
+});
+
+ipcMain.handle('export-session-html', async (_event, sessionData) => {
+  try {
+    const { title, time_created, model, source, messages } = sessionData;
+    const dateStr = new Date(time_created).toLocaleString('zh-CN');
+
+    let bodyHtml = '';
+    for (const msg of messages) {
+      const roleLabel = msg.role === 'user' ? '你' : msg.role === 'assistant' ? '助手' : msg.role;
+      let contentHtml = '';
+
+      if (source === 'claude') {
+        if (typeof msg.content === 'string') {
+          contentHtml = `<div class="text">${escapeHtml(msg.content)}</div>`;
+        } else if (Array.isArray(msg.content)) {
+          for (const c of msg.content) {
+            if (!c) continue;
+            if (c.type === 'text') {
+              contentHtml += `<div class="text">${escapeHtml(c.text || '')}</div>`;
+            } else if (c.type === 'thinking') {
+              contentHtml += `<details class="thinking"><summary>思考过程</summary><pre>${escapeHtml(c.thinking || '')}</pre></details>`;
+            } else if (c.type === 'tool_use') {
+              contentHtml += `<details class="tool"><summary>🔧 ${escapeHtml(c.name || 'tool')}</summary><div class="tool-section"><strong>输入:</strong><pre>${escapeHtml(JSON.stringify(c.input || {}, null, 2))}</pre></div></details>`;
+            } else if (c.type === 'tool_result') {
+              const resultContent = typeof c.content === 'string' ? c.content : JSON.stringify(c.content || {}, null, 2);
+              contentHtml += `<details class="tool"><summary>📋 tool_result${c.is_error ? ' ❌' : ''}</summary><div class="tool-section"><pre>${escapeHtml(resultContent)}</pre></div></details>`;
+            }
+          }
+        }
+      } else {
+        const parts = msg.parts || [];
+        for (const p of parts) {
+          const d = p.parsedData || {};
+          if (d.type === 'text') {
+            contentHtml += `<div class="text">${escapeHtml(d.text || '')}</div>`;
+          } else if (d.type === 'reasoning') {
+            contentHtml += `<details class="thinking"><summary>思考过程</summary><pre>${escapeHtml(d.text || '')}</pre></details>`;
+          } else if (d.type === 'tool') {
+            contentHtml += `<details class="tool"><summary>🔧 ${escapeHtml(d.tool || 'tool')}</summary><div class="tool-section"><strong>输入:</strong><pre>${escapeHtml(JSON.stringify(d.state?.input || {}, null, 2))}</pre></div>`;
+            if (d.state?.output) {
+              contentHtml += `<div class="tool-section"><strong>输出:</strong><pre>${escapeHtml(typeof d.state.output === 'string' ? d.state.output : JSON.stringify(d.state.output, null, 2))}</pre></div>`;
+            }
+            contentHtml += `</details>`;
+          }
+        }
+      }
+
+      if (contentHtml) {
+        bodyHtml += `
+        <div class="msg ${msg.role}">
+          <div class="msg-header"><span class="role">${roleLabel}</span></div>
+          <div class="msg-body">${contentHtml}</div>
+        </div>`;
+      }
+    }
+
+    const html = `<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>${escapeHtml(title || '会话')}</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','PingFang SC',sans-serif;background:#f5f5f7;color:#1d1d1f;line-height:1.6}
+.container{max-width:800px;margin:0 auto;padding:32px 24px}
+.header{border-bottom:1px solid #e5e5ea;padding-bottom:20px;margin-bottom:28px}
+.header h1{font-size:22px;font-weight:600;margin-bottom:8px}
+.header .meta{font-size:13px;color:#86868b}
+.header .meta span{display:inline-block;margin-right:16px}
+.msg{background:#fff;border-radius:12px;margin-bottom:16px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.06)}
+.msg.user{border-left:3px solid #0a84ff}
+.msg.assistant{border-left:3px solid #30d158}
+.msg-header{padding:10px 18px;background:#f5f5f7;font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;color:#6e6e73}
+.msg-body{padding:16px 20px}
+.text{white-space:pre-wrap;word-break:break-word;font-size:14px;margin-bottom:8px}
+.text:last-child{margin-bottom:0}
+.thinking{background:#f5f5f7;border-radius:8px;padding:12px 16px;margin:8px 0}
+.thinking summary{font-size:12px;font-weight:600;color:#86868b;cursor:pointer}
+.thinking pre{white-space:pre-wrap;font-size:13px;color:#6e6e73;margin-top:8px}
+.tool{background:#f5f5f7;border-radius:8px;padding:12px 16px;margin:8px 0}
+.tool summary{font-size:12px;font-weight:600;color:#0a84ff;cursor:pointer}
+.tool-section{margin-top:10px}
+.tool-section strong{font-size:11px;color:#86868b;display:block;margin-bottom:4px}
+.tool-section pre{white-space:pre-wrap;word-break:break-word;font-size:12px;color:#1d1d1f;background:#fff;padding:10px 14px;border-radius:6px;max-height:300px;overflow-y:auto;font-family:'SF Mono',monospace}
+</style>
+</head>
+<body>
+<div class="container">
+  <div class="header">
+    <h1>${escapeHtml(title || '未命名会话')}</h1>
+    <div class="meta">
+      <span>${dateStr}</span>
+      ${model ? `<span>${escapeHtml(model)}</span>` : ''}
+      ${source ? `<span>来源: ${escapeHtml(source)}</span>` : ''}
+    </div>
+  </div>
+  ${bodyHtml}
+</div>
+</body>
+</html>`;
+
+    const result = await dialog.showSaveDialog(mainWindow, {
+      title: '导出会话',
+      defaultPath: `${(title || 'session').replace(/[\\/:*?"<>|]/g, '-').slice(0, 50)}.html`,
+      filters: [{ name: 'HTML 文件', extensions: ['html'] }],
+    });
+
+    if (result.canceled) return { success: false, error: '已取消' };
+
+    fs.writeFileSync(result.filePath, html, 'utf-8');
+    logger.info('export-session-html saved:', result.filePath);
+    return { success: true, path: result.filePath };
+  } catch (err) {
+    logger.error('export-session-html failed:', err.message);
     return { success: false, error: err.message };
   }
 });

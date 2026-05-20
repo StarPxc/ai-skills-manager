@@ -169,7 +169,18 @@ export default function SkillDetail({ skill, onEdit, onDelete, isCreating, onCre
           </div>
           <div className="form-group">
             <label>SKILL.md 内容</label>
-            <textarea value={form.content} onChange={(e) => handleChange('content', e.target.value)} rows={12} style={{ fontFamily: 'SF Mono, Fira Code, monospace', fontSize: 12 }} />
+            <div className="md-editor-split">
+              <textarea
+                value={form.content}
+                onChange={(e) => handleChange('content', e.target.value)}
+                className="md-editor-textarea"
+                placeholder="# 技能名称&#10;&#10;## 描述&#10;..."
+                spellCheck={false}
+              />
+              <div className="md-editor-preview markdown-body">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>{form.content || '*输入内容后实时预览*'}</ReactMarkdown>
+              </div>
+            </div>
           </div>
         </div>
         <div className="detail-footer">

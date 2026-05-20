@@ -476,6 +476,7 @@ module.exports = {
   getSkillsDirectory,
   setSkillsDirectory,
   getDefaultSkillsDirectory,
+  getDisabledSkillsDirectory,
   ensureSkillsDirectory,
   parseFrontmatter,
   buildFrontmatter,
